@@ -55,20 +55,39 @@ def main():
     )
 
     parser.add_argument(
-        '-dsk', '--disk', '--enable-disk',
-        dest = 'watch_disk',
+        '-dskr', '--disk-read', '--enable-disk-read',
+        dest = 'watch_disk_read',
         action = 'store_true',
         default = False,
-        help = 'Enable disk I/O monitoring.'
+        help = 'Enable disk read monitoring.'
     )
+
+    parser.add_argument(
+        '-dskw', '--disk-write', '--enable-disk-write',
+        dest = 'watch_disk_write',
+        action = 'store_true',
+        default = False,
+        help = 'Enable disk write monitoring.'
+    )
+
+    parser.add_argument('-dsk', '--disk', '--enable-disk',
+                        dest = 'watch_disk',
+                        action = 'store_true',
+                        default = False,
+                        help = 'Enable disk I/O monitoring (override read and write).')
 
     args = parser.parse_args()
 
+    if args.watch_disk:
+        args.watch_disk_read = True
+        args.watch_disk_write = True
+        
     monitor = ResourceMonitor(
         args.pids,
         watch_cpu = args.watch_cpu,
         watch_memory = args.watch_memory,
-        watch_disk = args.watch_disk
+        watch_disk_read = args.watch_disk_read,
+        watch_disk_write = args.watch_disk_write
     )
 
     monitor.start(
