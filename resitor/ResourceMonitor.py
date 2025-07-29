@@ -6,14 +6,13 @@ import time
 from threading import Thread, Event
 import subprocess
 
-# TODO: Publish
 # TODO: Add documentation
 # TODO: Add tests
-# TODO: Test outside in another folder, like a user
 
 def start_monitor(pids, *, frequency = 20, window_size = 10, close_save_path = None,
                   watch_cpu = True, watch_memory = True,
                   watch_disk = True):
+
     if type(pids) is not list:
         pids = [pids]
 
