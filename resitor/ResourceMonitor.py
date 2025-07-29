@@ -3,12 +3,13 @@ import psutil
 import matplotlib.pyplot as plot
 import matplotlib.animation as animation
 import time
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 import subprocess
 
 def start_monitor(pids, *, frequency = 20, window_size = 10, close_save_path = None,
+                  log_path = None,
                   watch_cpu = True, watch_memory = True,
-                  watch_disk_read = False, watch_disk_write = False):
+                  watch_disk_read = False, watch_disk_write = False,):
 
     if type(pids) is not list:
         pids = [pids]
@@ -17,6 +18,9 @@ def start_monitor(pids, *, frequency = 20, window_size = 10, close_save_path = N
 
     if close_save_path is not None:
         cmd += ['-s', close_save_path]
+
+    if log_path is not None:
+        cmd += ['-l', log_path]
 
     if frequency is not None:
         cmd += ['-f', str(frequency)]
@@ -52,6 +56,7 @@ class ResourceMonitor:
 
         self.start_time = time.time()
         self._stop_event = Event()
+        self._data_lock = Lock()
 
         self.data = {}
 
@@ -122,57 +127,78 @@ class ResourceMonitor:
     def _monitor_loop(self):
         prev_disk = {}
 
+        log = False
+        if hasattr(self, '_log_file') and self._log_file:
+            log = True
+
         while not self._stop_event.is_set() and self.data:
             elapsed = time.time() - self.start_time
             terminated_pids = []
 
-            for pid, d in self.data.items():
-                try:
-                    proc = d['proc']
+            with self._data_lock:
+                for pid, d in self.data.items():
+                    try:
+                        proc = d['proc']
+                        d['x'].append(elapsed)
 
-                    if self.watch_cpu:
-                        d['cpu'].append(proc.cpu_percent(interval = None))
+                        if self.watch_cpu:
+                            cpu = proc.cpu_percent(interval = None)
+                            if cpu is None or cpu < 0:
+                                cpu = 0
 
-                    if self.watch_memory:
-                        d['memory'].append(proc.memory_info().rss / (1024 ** 2))
+                            d['cpu'].append(cpu)
 
-                    if self.watch_disk_read or self.watch_disk_write:
-                        try:
-                            io = proc.io_counters()
-                            prev = prev_disk.get(pid)
+                            if log:
+                                self._log_file.write(f'{elapsed:.2f},{pid},cpu,{cpu:.2f}\n')
 
-                        except:
-                            print('Disk I/O monitoring failed. psutil disk I/O is only available on Linux and Windows.')
-                            sys.exit(1)
+                        if self.watch_memory:
+                            mem = proc.memory_info().rss / (1024 ** 2)
+                            if mem is None or mem < 0:
+                                mem = 0
 
-                        if self.watch_disk_read:
-                            if prev:
-                                d['disk_read'].append(
-                                    ((io.read_bytes - prev.read_bytes) / (1024 ** 2)) / self.update_period
-                                )
+                            d['memory'].append(mem)
 
-                            else:
-                                d['disk_read'].append(0)
+                            if log:
+                                self._log_file.write(f'{elapsed:.2f},{pid},memory,{mem:.2f}\n')
 
-                        if self.watch_disk_write:
-                            if prev:
-                                d['disk_write'].append(
-                                    -((io.write_bytes - prev.write_bytes) / (1024 ** 2)) / self.update_period
-                                )
+                        if self.watch_disk_read or self.watch_disk_write:
+                            try:
+                                io = proc.io_counters()
+                                prev = prev_disk.get(pid)
 
-                            else:
-                                d['disk_write'].append(0)
+                            except:
+                                print('Disk I/O monitoring failed. psutil disk I/O is only available on Linux and Windows.')
+                                plot.close()
+                                sys.exit(1)
 
-                        prev_disk[pid] = io
+                            if self.watch_disk_read:
+                                value = ((io.read_bytes - prev.read_bytes) / (1024 ** 2)) / self.update_period if prev else 0
+                                if value is None or value < 0:
+                                    value = 0
 
-                    d['x'].append(elapsed)
+                                d['disk_read'].append(value)
 
-                except psutil.NoSuchProcess:
-                    print(f'PID {pid} has terminated.')
-                    terminated_pids.append(pid)
+                                if log:
+                                    self._log_file.write(f'{elapsed:.2f},{pid},disk_read,{value:.4f}\n')
 
-            for pid in terminated_pids:
-                del self.data[pid]
+                            if self.watch_disk_write:
+                                value = -((io.write_bytes - prev.write_bytes) / (1024 ** 2)) / self.update_period if prev else 0
+                                if value is None or value > 0:
+                                    value = 0
+
+                                d['disk_write'].append(value)
+
+                                if log:
+                                    self._log_file.write(f'{elapsed:.2f},{pid},disk_write,{value:.4f}\n')
+
+                            prev_disk[pid] = io
+
+                    except psutil.NoSuchProcess:
+                        print(f'PID {pid} has terminated.')
+                        terminated_pids.append(pid)
+
+                for pid in terminated_pids:
+                    del self.data[pid]
 
             if not self.data:
                 print('All monitored processes have terminated.')
@@ -184,27 +210,29 @@ class ResourceMonitor:
         lines = []
 
         for pid, d in self.data.items():
+            name = f'PID {pid} - ' + d['proc'].name()
+
             if self.watch_cpu:
                 self.ax_cpu.set_xlim(0, self.window_size)
-                (cpu_line,) = self.ax_cpu.plot([], [], label = f'PID {pid}')
+                (cpu_line,) = self.ax_cpu.plot([], [], label = name)
                 d['cpu_line'] = cpu_line
                 lines.append(cpu_line)
 
             if self.watch_memory:
                 self.ax_memory.set_xlim(0, self.window_size)
-                (memory_line,) = self.ax_memory.plot([], [], label = f'PID {pid}')
+                (memory_line,) = self.ax_memory.plot([], [], label = name)
                 d['memory_line'] = memory_line
                 lines.append(memory_line)
 
             if self.watch_disk_read:
                 self.ax_disk.set_xlim(0, self.window_size)
-                (read_line,) = self.ax_disk.plot([], [], label = f'PID {pid} Read')
+                (read_line,) = self.ax_disk.plot([], [], label = f'{name} Read')
                 d['disk_read_line'] = read_line
                 lines.append(read_line)
 
             if self.watch_disk_write:
                 self.ax_disk.set_xlim(0, self.window_size)
-                (write_line,) = self.ax_disk.plot([], [], label = f'PID {pid} Write')
+                (write_line,) = self.ax_disk.plot([], [], label = f'{name} Write')
                 d['disk_write_line'] = write_line
                 lines.append(write_line)
 
@@ -222,78 +250,86 @@ class ResourceMonitor:
     def _update_plot(self, frame):
         all_lines = []
 
-        if not self.data:
-            print('No data left.')
-            sys.exit(1)
+        with self._data_lock:
+            if not self.data:
+                print('No data left.')
+                sys.exit(1)
 
-        xmax = 0
-        xmin = float('inf')
-        valid_data_found = False
+            xmax = 0
+            xmin = float('inf')
+            valid_data_found = False
 
-        for d in self.data.values():
-            if not d['x']:
-                continue
+            for d in self.data.values():
+                if not d['x']:
+                    continue
 
-            valid_data_found = True
-            xmax = max(xmax, d['x'][-1])
-            xmin = xmax - self.window_size if self.window_size is not None else min(xmin, d['x'][0])
+                valid_data_found = True
+                xmax = max(xmax, d['x'][-1])
+                xmin = xmax - self.window_size if self.window_size is not None else min(xmin, d['x'][0])
 
-            if self.window_size is not None:
-                min_i = next((i for i, val in enumerate(d['x']) if val >= xmin - self.update_period), 0)
-                d['x'] = d['x'][min_i:]
+                if self.window_size is not None:
+                    min_i = next((i for i, val in enumerate(d['x']) if val >= xmin - self.update_period), 0)
+                    d['x'] = d['x'][min_i:]
+
+                    if self.watch_cpu:
+                        d['cpu'] = d['cpu'][min_i:]
+
+                    if self.watch_memory:
+                        d['memory'] = d['memory'][min_i:]
+
+                    if self.watch_disk_read:
+                        d['disk_read'] = d['disk_read'][min_i:]
+
+                    if self.watch_disk_write:
+                        d['disk_write'] = d['disk_write'][min_i:]
 
                 if self.watch_cpu:
-                    d['cpu'] = d['cpu'][min_i:]
+                    d['cpu_line'].set_data(d['x'], d['cpu'])
+                    all_lines.append(d['cpu_line'])
 
                 if self.watch_memory:
-                    d['memory'] = d['memory'][min_i:]
+                    d['memory_line'].set_data(d['x'], d['memory'])
+                    all_lines.append(d['memory_line'])
 
                 if self.watch_disk_read:
-                    d['disk_read'] = d['disk_read'][min_i:]
+                    d['disk_read_line'].set_data(d['x'], d['disk_read'])
+                    all_lines.append(d['disk_read_line'])
 
                 if self.watch_disk_write:
-                    d['disk_write'] = d['disk_write'][min_i:]
+                    d['disk_write_line'].set_data(d['x'], d['disk_write'])
+                    all_lines.append(d['disk_write_line'])
 
-            if self.watch_cpu:
-                d['cpu_line'].set_data(d['x'], d['cpu'])
-                all_lines.append(d['cpu_line'])
+            if valid_data_found:
+                if self.watch_cpu:
+                    self.ax_cpu.set_xlim(xmin, xmax)
+                    self.ax_cpu.relim()
+                    self.ax_cpu.autoscale_view()
 
-            if self.watch_memory:
-                d['memory_line'].set_data(d['x'], d['memory'])
-                all_lines.append(d['memory_line'])
+                if self.watch_memory:
+                    self.ax_memory.set_xlim(xmin, xmax)
+                    self.ax_memory.relim()
+                    self.ax_memory.autoscale_view()
 
-            if self.watch_disk_read:
-                d['disk_read_line'].set_data(d['x'], d['disk_read'])
-                all_lines.append(d['disk_read_line'])
-
-            if self.watch_disk_write:
-                d['disk_write_line'].set_data(d['x'], d['disk_write'])
-                all_lines.append(d['disk_write_line'])
-
-        if valid_data_found:
-            if self.watch_cpu:
-                self.ax_cpu.set_xlim(xmin, xmax)
-                self.ax_cpu.relim()
-                self.ax_cpu.autoscale_view()
-
-            if self.watch_memory:
-                self.ax_memory.set_xlim(xmin, xmax)
-                self.ax_memory.relim()
-                self.ax_memory.autoscale_view()
-
-            if self.watch_disk_read or self.watch_disk_write:
-                self.ax_disk.set_xlim(xmin, xmax)
-                self.ax_disk.relim()
-                self.ax_disk.autoscale_view()
+                if self.watch_disk_read or self.watch_disk_write:
+                    self.ax_disk.set_xlim(xmin, xmax)
+                    self.ax_disk.relim()
+                    self.ax_disk.autoscale_view()
 
         return all_lines
 
-    def start(self, close_save_path = None, frequency = 20, window_size = 10):
+    def start(self, close_save_path = None, frequency = 20, window_size = 10, log_path = None):
         self.update_period = 1 / float(frequency)
         self.window_size = float(window_size)
 
         if self.window_size <= 0:
             self.window_size = None
+
+        if log_path is not None:
+            self._log_file = open(log_path, 'w', buffering = 1)
+            self._log_file.write('timestamp,pid,metric,value\n')
+
+        else:
+            self._log_file = None
 
         self.monitor_thread = Thread(target = self._monitor_loop, daemon = True)
         self.monitor_thread.start()
@@ -315,8 +351,17 @@ class ResourceMonitor:
 
     def stop(self, save_path = None):
         self._stop_event.set()
-        self.monitor_thread.join()
+
+        try:
+            self.monitor_thread.join()
+
+        except:
+            print('Warning: Monitor thread could not be joined.')
 
         if save_path is not None:
             self.fig.savefig(save_path)
             print(f'Last frame saved to {save_path}')
+
+        if hasattr(self, '_log_file') and self._log_file:
+            self._log_file.close()
+            print(f'Log saved to {self._log_file.name}')

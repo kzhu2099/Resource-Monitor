@@ -15,6 +15,10 @@ Author: Kevin Zhu
 - multiple PIDs
 - CLI or Python
 
+## Research Usage
+
+With the increasing usage of artificial intelligence, machine learning, and generally computationally expensive tools, it is more important than ever to monitor different processes for overall efficiency. `resitor` introduces a new perspective with a visual graph of individual processes. Its `CLI` allows full integration for any process, extending its capabilities past `Python`. The novelty of `resitor` is its independant graph where users are able to interactively identify when a problem happens--as opposed to retrospective analysis found in other software. The closest software that allows users to visualize memory usage is `memory_profiler`, but it only generates a plot after the data is collected. Others that show live memory usage by-process include the built-in `top`, but it lacks visualization.
+
 ## Installation
 
 To install resitor, use pip: ```pip install resitor```.
@@ -71,7 +75,13 @@ If you don't want to watch CPU or memory, simply add the `-noc` or `nom` flags.
 
 For Windows / Linux users, you may also watch the disk usage through the `-dsk` flag.
 
-Currently, `psutil` (what this is built on) does not have per-process network monitoring. Furthermore, macOS users do not have access to per-process disk monitoring.
+## Limitations
+
+Currently, `psutil` (what this is built on) does not have per-process network monitoring.
+
+Furthermore, macOS users do not have access to per-process disk monitoring.
+
+CPU granularity is only limited to 1 / 10th of a percent.
 
 ## License
 

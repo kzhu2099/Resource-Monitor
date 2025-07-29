@@ -70,18 +70,28 @@ def main():
         help = 'Enable disk write monitoring.'
     )
 
-    parser.add_argument('-dsk', '--disk', '--enable-disk',
-                        dest = 'watch_disk',
-                        action = 'store_true',
-                        default = False,
-                        help = 'Enable disk I/O monitoring (override read and write).')
+    parser.add_argument(
+        '-dsk', '--disk', '--enable-disk',
+        dest = 'watch_disk',
+        action = 'store_true',
+        default = False,
+        help = 'Enable disk I/O monitoring (override read and write).'
+    )
+
+    parser.add_argument(
+        '-l', '-log', '--log_path',
+        dest = 'log_path',
+        type = str,
+        default = None,
+        help = 'File to save the monitoring log.'
+    )
 
     args = parser.parse_args()
 
     if args.watch_disk:
         args.watch_disk_read = True
         args.watch_disk_write = True
-        
+
     monitor = ResourceMonitor(
         args.pids,
         watch_cpu = args.watch_cpu,
@@ -93,7 +103,8 @@ def main():
     monitor.start(
         close_save_path = args.close_save_path,
         frequency = args.frequency,
-        window_size = args.window_size
+        window_size = args.window_size,
+        log_path = args.log_path
     )
 
 if __name__ == '__main__':

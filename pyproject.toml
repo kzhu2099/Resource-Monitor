@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = 'resitor'
 
-version = '0.0.2'
+version = '0.0.3'
 
 description = 'a package to graphically monitor per-process resource usage'
 
@@ -40,6 +40,9 @@ dependencies = ['psutil', 'matplotlib']
 [project.urls]
 Homepage = 'https://github.com/kzhu2099/Resource-Monitor'
 Issues = 'https://github.com/kzhu2099/Resource-Monitor/issues'
+
+[project.scripts]
+resitor = 'resitor.__main__:main'
 
 [tool.setuptools.package-data]
 'resitor.data' = ['*']
