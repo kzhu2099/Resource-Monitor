@@ -9,7 +9,22 @@ import subprocess
 def start_monitor(pids, *, frequency = 20, window_size = 10, close_save_path = None,
                   log_path = None,
                   watch_cpu = True, watch_memory = True,
-                  watch_disk_read = False, watch_disk_write = False,):
+                  watch_disk_read = False, watch_disk_write = False):
+
+    '''
+    Launch a subprocess to monitor system resources for given PIDs using the CLI tool.
+
+    Parameters:
+        pids (int or list of int): Process ID(s) to monitor.
+        frequency (int): Update frequency in Hz (default is 20).
+        window_size (int): Duration of the sliding window in seconds (default is 10).
+        close_save_path (str): Optional path to save the plot when the window closes.
+        log_path (str): Optional path to write a CSV log of measurements.
+        watch_cpu (bool): Whether to monitor CPU usage.
+        watch_memory (bool): Whether to monitor memory usage.
+        watch_disk_read (bool): Whether to monitor disk read I/O.
+        watch_disk_write (bool): Whether to monitor disk write I/O.
+    '''
 
     if type(pids) is not list:
         pids = [pids]
@@ -45,6 +60,18 @@ def start_monitor(pids, *, frequency = 20, window_size = 10, close_save_path = N
 class ResourceMonitor:
     def __init__(self, pids, watch_cpu = True, watch_memory = True,
                  watch_disk_read = False, watch_disk_write = False):
+
+        '''
+        Initialize the ResourceMonitor for tracking CPU, memory, and disk usage of processes.
+        Generally, users should use the `start_monitor` function instead of this constructor.
+
+        Parameters:
+            pids (list of int): List of PIDs to monitor.
+            watch_cpu (bool): Enable CPU usage tracking.
+            watch_memory (bool): Enable memory usage tracking.
+            watch_disk_read (bool): Enable disk read I/O tracking.
+            watch_disk_write (bool): Enable disk write I/O tracking.
+        '''
 
         if not any([watch_cpu, watch_memory, watch_disk_read, watch_disk_write]):
             raise ValueError('At least one metric must be enabled.')
@@ -318,6 +345,17 @@ class ResourceMonitor:
         return all_lines
 
     def start(self, close_save_path = None, frequency = 20, window_size = 10, log_path = None):
+
+        '''
+        Start the monitoring thread and live plot display.
+
+        Parameters:
+            close_save_path (str): Optional path to save the final plot when the window closes.
+            frequency (int): Update frequency in Hz (default is 20).
+            window_size (float): Length of sliding time window in seconds (default is 10).
+            log_path (str): Optional CSV file path to log data.
+        '''
+
         self.update_period = 1 / float(frequency)
         self.window_size = float(window_size)
 
@@ -350,6 +388,14 @@ class ResourceMonitor:
         plot.show()
 
     def stop(self, save_path = None):
+
+        '''
+        Stop the monitoring thread and optionally save the last plot and log.
+
+        Parameters:
+            save_path (str): Optional path to save the current plot as an image.
+        '''
+        
         self._stop_event.set()
 
         try:
