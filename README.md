@@ -1,5 +1,9 @@
 # resitor
 
+`resitor` is a package to graphically monitor per-process resource usage.
+
+While many systems have built-in functionality for graphical analysis, it only is available for system-wide usage. Users cannot analyze individual resource usage with other tools.
+
 - HomePage: https://github.com/kzhu2099/Resource-Monitor
 - Issues: https://github.com/kzhu2099/Resource-Monitor/issues
 
