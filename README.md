@@ -2,12 +2,12 @@
 
 `resitor` is a package to graphically monitor per-process resource usage.
 
-While many systems have built-in functionality for graphical analysis, it only is available for system-wide usage. Users cannot analyze individual resource usage with other tools.
+While many systems have built-in functionality for graphical analysis, it only is available for system-wide usage. Users cannot analyze individual resource usage with other tools. Resitor changes this by providing capabilities to analyze one (or more) processes for their individual memory, CPU, and disk (Windows / Linux) usage.
 
 - HomePage: https://github.com/kzhu2099/Resource-Monitor
 - Issues: https://github.com/kzhu2099/Resource-Monitor/issues
 
-[![PyPI Downloads](https://static.pepy.tech/badge/resitor)](https://pepy.tech/projects/resitor)
+[![PyPI Downloads](https://static.pepy.tech/badge/resitor)](https://pepy.tech/projects/resitor) ![PyPI version](https://img.shields.io/pypi/v/resitor.svg)
 
 Author: Kevin Zhu
 
@@ -25,7 +25,7 @@ With the increasing usage of artificial intelligence, machine learning, and gene
 
 ## Installation
 
-To install resitor, use pip: ```pip install resitor```.
+To install `resitor`, use pip: ```pip install resitor```.
 
 However, many prefer to use a virtual environment.
 
